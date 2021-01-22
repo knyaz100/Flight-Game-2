@@ -68,7 +68,7 @@ class GameViewController: UIViewController {
             }
         }
         duration *= 0.9
-        print(#line, "duration = ", duration)
+        //print(#line, "duration = ", duration)
         
     }
     
