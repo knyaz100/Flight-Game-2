@@ -11,10 +11,19 @@ import SceneKit
 
 class GameViewController: UIViewController {
 
+    // MARK: - Outlets
+    let scoreLabel = UILabel()
     
+    // MARK: - Stored Properties
     var duration: TimeInterval = 10
-    var score = 0
+    var score = 0 {
+        didSet {
+            print(#line, #function, score)
+            scoreLabel.text = "Score: \(score)"
+        }
+    }
     
+    // MARK: - Computed Properties
     var scene: SCNScene? {
         (view as! SCNView).scene!
     }
@@ -23,12 +32,21 @@ class GameViewController: UIViewController {
     var ship: SCNNode? {
         scene?.rootNode.childNode(withName: "ship", recursively: true)
     }
+    // MARK: - Methods
+    
+    func addLabel() {
+        
+        scoreLabel.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 100)
+        scoreLabel.textAlignment = .center
+        scoreLabel.font = UIFont.systemFont(ofSize: 30)
+        scoreLabel.textColor = .white
+        scoreLabel.numberOfLines = 2
+        view.addSubview(scoreLabel)
+        score = 0
+    }
     
     func addShip() {
-        
-        
-        
-        
+
         //set ship position
         let x = Int.random(in: -25 ... 25)
         let y = Int.random(in: -25 ... 25)
@@ -45,9 +63,9 @@ class GameViewController: UIViewController {
         //animate ship
         ship?.runAction(SCNAction.move(to: SCNVector3(), duration: duration)) {
             DispatchQueue.main.async {
+                self.scoreLabel.text = "GAME OVER\nScore: \(self.score)"
                 self.ship?.removeFromParentNode()
             }
-            print(#line, "GAME OVER")
         }
         duration *= 0.9
         print(#line, "duration = ", duration)
@@ -102,6 +120,9 @@ class GameViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         scnView.addGestureRecognizer(tapGesture)
         
+        //add llabel
+        addLabel()
+        
         //add ship
         addShip()
     }
@@ -135,7 +156,6 @@ class GameViewController: UIViewController {
                     self.addShip()
                 }
                 self.score += 1
-                print(#line, self.score)
             }
             
             material.emission.contents = UIColor.red
@@ -146,6 +166,7 @@ class GameViewController: UIViewController {
         }
     }
     
+    // MARK: - Inhiereted Methods
     override var shouldAutorotate: Bool {
         return true
     }
