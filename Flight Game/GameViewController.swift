@@ -23,6 +23,8 @@ class GameViewController: UIViewController {
         }
     }
     
+    var isGameOver = false
+    
     // MARK: - Computed Properties
     var scene: SCNScene? {
         (view as! SCNView).scene!
@@ -61,12 +63,22 @@ class GameViewController: UIViewController {
         
         
         //animate ship
-        ship?.runAction(SCNAction.move(to: SCNVector3(), duration: duration)) {
-            DispatchQueue.main.async {
-                self.scoreLabel.text = "GAME OVER\nScore: \(self.score)"
-                self.ship?.removeFromParentNode()
+        if(!self.isGameOver){
+            
+            ship?.runAction(SCNAction.move(to: SCNVector3(), duration: duration)) {
+                DispatchQueue.main.async {
+                    self.scoreLabel.text = "GAME OVER\nScore: \(self.score)"
+                    self.isGameOver = true
+                    //self.ship?.removeFromParentNode()
+                    self.ship?.runAction(SCNAction.rotate(by: CGFloat(2*3.141592), around: SCNVector3(x: 0, y: 0, z: 1), duration: 2))
+                    let scnView = self.view as! SCNView
+                    scnView.allowsCameraControl = true
+                }
             }
+        } else {
+            print(#line, "never get here")
         }
+        
         duration *= 0.9
         //print(#line, "duration = ", duration)
         
@@ -108,7 +120,7 @@ class GameViewController: UIViewController {
         scnView.scene = scene
         
         // allows the user to manipulate the camera
-        scnView.allowsCameraControl = true
+        scnView.allowsCameraControl = false
         
         // show statistics such as fps and timing information
         scnView.showsStatistics = false
@@ -137,7 +149,7 @@ class GameViewController: UIViewController {
         let hitResults = scnView.hitTest(p, options: [:])
         
         // check that we clicked on at least one object
-        if hitResults.count > 0 {
+        if hitResults.count > 0 && !self.isGameOver {
             // retrieved the first clicked object
             let result = hitResults[0]
             
