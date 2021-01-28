@@ -5,23 +5,35 @@
 //  Created by Vasily Churbanov on 2021-01-21.
 //
 
-//import UIKit
-//import QuartzCore
 import SceneKit
+import AVFoundation
 
 class GameViewController: UIViewController {
-
+    
     // MARK: - Outlets
     let scoreLabel = UILabel()
+    let restartButton = UIButton()
+    let highScoreLabel = UILabel()
+    let resetHSButton = UIButton()
     
     // MARK: - Stored Properties
     var duration: TimeInterval = 10
     var score = 0 {
         didSet {
-            print(#line, #function, score)
             scoreLabel.text = "Score: \(score)"
         }
     }
+    var highScore = 0 {
+        didSet {
+            highScoreLabel.text = "High Score: \(highScore)"
+        }
+    }
+    
+    let cameraNode = SCNNode()
+    var initialPointOfView = SCNNode()
+    var initialCameraPointOfView = SCNNode()
+    var initialShipOrientation = SCNVector4()
+    var runCount = 0
     
     var isGameOver = false
     
@@ -30,13 +42,14 @@ class GameViewController: UIViewController {
         (view as! SCNView).scene!
     }
         
-    
     var ship: SCNNode? {
         scene?.rootNode.childNode(withName: "ship", recursively: true)
     }
+    
+    
     // MARK: - Methods
     
-    func addLabel() {
+    fileprivate func addLabels() {
         
         scoreLabel.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 100)
         scoreLabel.textAlignment = .center
@@ -45,43 +58,112 @@ class GameViewController: UIViewController {
         scoreLabel.numberOfLines = 2
         view.addSubview(scoreLabel)
         score = 0
+        
+        highScoreLabel.frame = CGRect(x: 2, y: -15, width: view.bounds.width, height: 50)
+        highScoreLabel.textAlignment = .left
+        highScoreLabel.font = UIFont.systemFont(ofSize: 15)
+        highScoreLabel.textColor = .green
+        highScoreLabel.numberOfLines = 1
+        view.addSubview(highScoreLabel)
+        highScore = getHighScore()
+        
     }
     
-    func addShip() {
-
+    fileprivate func addRestartButton(){
+        restartButton.frame = CGRect(x: 0, y: view.bounds.maxY-50, width: view.bounds.width, height: 30)
+        restartButton.setTitle("RESTART", for: UIControl.State())
+        restartButton.addTarget(self, action:#selector(restartButtonPressed), for: UIControl.Event.touchUpInside)
+        view.addSubview(restartButton)
+    }
+    
+    fileprivate func addResetHSButton(){
+        resetHSButton.frame = CGRect(x: 0, y: view.bounds.maxY-20, width: view.bounds.width, height: 20)
+        resetHSButton.setTitle("reset high score", for: UIControl.State())
+        
+        resetHSButton.setTitleColor(UIColor(ciColor: .green), for: UIControl.State())
+        resetHSButton.titleLabel?.font = UIFont.systemFont(ofSize: 15)
+        resetHSButton.addTarget(self, action:#selector(resetHSButtonPressed), for: UIControl.Event.touchUpInside)
+        view.addSubview(resetHSButton)
+    }
+    
+    @objc func resetHSButtonPressed(Sender: UIButton! ) {
+        self.resetHighScore()
+    }
+    
+    @objc func restartButtonPressed(Sender: UIButton! ) {
+        score = 0
+        duration = 10
+        runCount += 1
+        addShip()
+    }
+    
+    fileprivate func addShip() {
+        
+        //add ship and scene additional initialization
+        self.isGameOver = false
+        self.restartButton.isHidden = true
+        self.resetHSButton.isHidden = true
+        
+        let scnView = self.view as! SCNView
+        scnView.allowsCameraControl = false
+        
+        
         //set ship position
-        let x = Int.random(in: -25 ... 25)
-        let y = Int.random(in: -25 ... 25)
-        let z = -90
-
+        let x = Int.random(in: -30 ... 30)
+        let y = Int.random(in: -30 ... 30)
+        let z = -95
+        
         ship?.position = SCNVector3(x, y, z)
         
         //remove previous ship animation
         ship?.removeAllActions()
         
+        // replace the camera
+        cameraNode.position = SCNVector3(x: 0, y: 0, z: 15)
+        //restore initial point of view and ship orientation
+        scnView.pointOfView = initialPointOfView
+        ship?.orientation = initialShipOrientation
+        
         ship?.look(at: SCNVector3(2 * x, 2 * y, 2 * z))
         
         
         //animate ship
-        if(!self.isGameOver){
-            
-            ship?.runAction(SCNAction.move(to: SCNVector3(), duration: duration)) {
-                DispatchQueue.main.async {
-                    self.scoreLabel.text = "GAME OVER\nScore: \(self.score)"
-                    self.isGameOver = true
-                    //self.ship?.removeFromParentNode()
-                    self.ship?.runAction(SCNAction.rotate(by: CGFloat(2*3.141592), around: SCNVector3(x: 0, y: 0, z: 1), duration: 2))
-                    let scnView = self.view as! SCNView
-                    scnView.allowsCameraControl = true
-                }
+        ship?.runAction(SCNAction.move(to: SCNVector3(), duration: duration)) {
+            DispatchQueue.main.async {
+                self.scoreLabel.text = "GAME OVER\nScore: \(self.score)"
+                self.setHighScore(newHighScore: self.score)
+                self.isGameOver = true
+                // to play sound
+                AudioServicesPlaySystemSound (1027)
+                self.ship?.runAction(SCNAction.rotate(by: CGFloat(10*Double.pi), around: SCNVector3(x: 0, y: 0, z: 1), duration: 3))
+                scnView.allowsCameraControl = true
+                self.restartButton.isHidden = false
+                self.resetHSButton.isHidden = false
             }
-        } else {
-            print(#line, "never get here")
         }
         
         duration *= 0.9
-        //print(#line, "duration = ", duration)
         
+    }
+    
+    fileprivate func getHighScore() -> Int {
+        let savedScore = UserDefaults.standard.integer(forKey: "highScore")
+        self.highScore = savedScore
+        return self.highScore
+    }
+    
+    fileprivate func setHighScore(newHighScore: Int) {
+        
+        if(newHighScore > self.highScore) {
+            self.highScore = newHighScore
+            UserDefaults.standard.set(newHighScore, forKey: "highScore")
+        }
+    }
+    fileprivate func resetHighScore() {
+        
+        self.highScore = 0
+        UserDefaults.standard.set(0, forKey: "highScore")
+
     }
     
     override func viewDidLoad() {
@@ -89,29 +171,6 @@ class GameViewController: UIViewController {
         
         // create a new scene
         let scene = SCNScene(named: "art.scnassets/ship.scn")!
-        
-        // create and add a camera to the scene
-        let cameraNode = SCNNode()
-        cameraNode.camera = SCNCamera()
-        scene.rootNode.addChildNode(cameraNode)
-        
-        // place the camera
-        cameraNode.position = SCNVector3(x: 0, y: 0, z: 15)
-        
-        // create and add a light to the scene
-        let lightNode = SCNNode()
-        lightNode.light = SCNLight()
-        lightNode.light!.type = .omni
-        lightNode.position = SCNVector3(x: 0, y: 10, z: 10)
-        scene.rootNode.addChildNode(lightNode)
-        
-        // create and add an ambient light to the scene
-        let ambientLightNode = SCNNode()
-        ambientLightNode.light = SCNLight()
-        ambientLightNode.light!.type = .ambient
-        ambientLightNode.light!.color = UIColor.darkGray
-        scene.rootNode.addChildNode(ambientLightNode)
-        
         
         // retrieve the SCNView
         let scnView = self.view as! SCNView
@@ -128,12 +187,42 @@ class GameViewController: UIViewController {
         // configure the view
         scnView.backgroundColor = UIColor.black
         
+        // create and add a camera to the scene
+        //let cameraNode = SCNNode()
+        cameraNode.camera = SCNCamera()
+        scene.rootNode.addChildNode(cameraNode)
+        
+        // place the camera and remember Point of View Orientation
+        cameraNode.position = SCNVector3(x: 0, y: 0, z: 15)
+        initialPointOfView = scnView.pointOfView!
+        initialShipOrientation = ship?.orientation ?? SCNVector4()
+        
+        // create and add a light to the scene
+        let lightNode = SCNNode()
+        lightNode.light = SCNLight()
+        lightNode.light!.type = .omni
+        lightNode.position = SCNVector3(x: 0, y: 10, z: 10)
+        scene.rootNode.addChildNode(lightNode)
+        
+        // create and add an ambient light to the scene
+        let ambientLightNode = SCNNode()
+        ambientLightNode.light = SCNLight()
+        ambientLightNode.light!.type = .ambient
+        ambientLightNode.light!.color = UIColor.darkGray
+        scene.rootNode.addChildNode(ambientLightNode)
+        
+        
+        
         // add a tap gesture recognizer
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         scnView.addGestureRecognizer(tapGesture)
         
-        //add llabel
-        addLabel()
+        //add labels&button
+        addLabels()
+        addRestartButton()
+        self.restartButton.isHidden = true
+        addResetHSButton()
+        self.resetHSButton.isHidden = true
         
         //add ship
         addShip()
@@ -159,7 +248,7 @@ class GameViewController: UIViewController {
             // highlight it
             SCNTransaction.begin()
             SCNTransaction.animationDuration = 0.2
-             
+            
             // on completion - unhighlight
             SCNTransaction.completionBlock = {
                 
@@ -173,8 +262,11 @@ class GameViewController: UIViewController {
             material.emission.contents = UIColor.red
             
             SCNTransaction.commit()
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            let hapticFeedback = UINotificationFeedbackGenerator()
+            hapticFeedback.notificationOccurred(.error)
+            // to play sound
+            AudioServicesPlaySystemSound (1004)
+            
         }
     }
     
